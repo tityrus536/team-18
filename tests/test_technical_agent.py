@@ -1,15 +1,9 @@
-"""Runs the Technical agent end to end with a FAKE model (no API key, no internet).
-
-The fake model behaves like an LLM that calls one tool, then gives its final answer.
-It checks that tools, prompt and output format are wired correctly.
-"""
+"""Runs the Technical agent end to end with a FAKE model (no API key, no internet)."""
 import sys
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from langchain_core.language_models.fake_chat_models import GenericFakeChatModel
-from langchain_core.messages import AIMessage
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from qdc.agents import technical  # noqa: E402
@@ -21,33 +15,37 @@ UNIVERSE = pd.DataFrame(
 )
 
 
-class FakeToolModel(GenericFakeChatModel):
-    def bind_tools(self, tools, **kwargs):
+class FakeLLM:
+    """Acts like Gemini: records what it was sent and returns a fixed report."""
+    def __init__(self, report):
+        self.report, self.requests = report, []
+
+    def with_structured_output(self, schema):
         return self
 
-
-def test_tools_return_real_numbers():
-    tools = {t.name: t for t in technical.build_tools(PRICES, UNIVERSE)}
-    snap = tools["get_technical_snapshot"].invoke({"deck_ticker": "SEMIS"})
-    assert snap["usable"] and snap["trend"] == "uptrend"
-    assert "error" in tools["get_technical_snapshot"].invoke({"deck_ticker": "NOPE"})
+    def invoke(self, messages):
+        self.requests.append(messages)
+        return self.report
 
 
-def test_agent_returns_structured_report(monkeypatch):
-    report = {
-        "as_of": str(DAYS[-1].date()),
-        "views": [{"deck_ticker": "SEMIS", "signal": "positive", "confidence": "medium",
-                   "evidence": ["3m return +6%"], "risks": ["tech concentration"]}],
-        "summary": "SEMIS is in an uptrend.",
-        "data_issues": [],
-    }
-    fake = FakeToolModel(messages=iter([
-        AIMessage(content="", tool_calls=[{"name": "get_technical_snapshot", "args": {"deck_ticker": "SEMIS"}, "id": "1"}]),
-        AIMessage(content="", tool_calls=[{"name": "TechnicalReport", "args": report, "id": "2"}]),
-    ]))
+def test_snapshots_contain_real_numbers():
+    snaps = {s["deck_ticker"]: s for s in technical.build_snapshots(PRICES, UNIVERSE)}
+    assert snaps["SEMIS"]["trend"] == "uptrend"
+    assert snaps["SEMIS"]["return_3m_vs_benchmark"] is not None
+    assert snaps["SEMIS"]["theme"] == "Equity / Tech"
+
+
+def test_agent_uses_one_request_and_returns_report(monkeypatch):
+    report = technical.TechnicalReport(
+        as_of=str(DAYS[-1].date()),
+        views=[technical.TechnicalView(deck_ticker="SEMIS", signal="positive", confidence="medium",
+                                       evidence=["3m return +6%"], risks=["tech concentration"])],
+        summary="SEMIS is in an uptrend.", data_issues=[])
+    fake = FakeLLM(report)
     monkeypatch.setattr(technical, "load_prices", lambda as_of=None: PRICES)
     monkeypatch.setattr(technical, "available_universe", lambda: UNIVERSE)
 
     result = technical.run_technical_agent(llm=fake)
-    assert isinstance(result, technical.TechnicalReport)
+    assert len(fake.requests) == 1  # one request for all ETFs: fits the free quota
+    assert "SEMIS" in fake.requests[0][1][1]  # the numbers were sent
     assert result.views[0].signal == "positive"

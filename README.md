@@ -16,6 +16,9 @@ Data -> Technical + Macro (in parallel) -> Portfolio Options -> Risk -> Challeng
 - **All agents share one state** (`qdc/agents/state.py`). Each agent reads it and
   returns only its own part. Agree any change to this file with the team.
 - **No look-ahead.** Agents read saved prices cut at an `as_of` date, never live data.
+- **Few LLM requests.** The free Gemini tier allows about 20 requests a day per model.
+  So Python gathers and calculates everything first, and each agent sends it to the
+  LLM in one or a few grouped requests (Data agent: 1 per 10 ETFs; Technical: 1 per 25).
 - **Humans decide.** Agents give views and evidence; the team approves every order
   and logs it in the Decision Log (Drive, folder 03).
 

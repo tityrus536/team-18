@@ -33,7 +33,8 @@ if __name__ == "__main__":
         etfs = u[u["yahoo_ticker"].isna()]
     if args.limit:
         etfs = etfs.head(args.limit)
-    print(f"Searching tickers for {len(etfs)} ETFs. This takes a few seconds per ETF.\n")
+    print(f"Searching tickers for {len(etfs)} ETFs: Yahoo first (no quota used), then about "
+          f"{-(-len(etfs) // 10)} Gemini requests.\n")
 
     proposals = run_ticker_finder(etfs)
     out = ROOT / "outputs" / "ticker_proposals.csv"
@@ -43,7 +44,10 @@ if __name__ == "__main__":
         proposals = pd.concat([old, proposals], ignore_index=True)
     proposals.to_csv(out, index=False)
 
-    cols = ["deck_ticker", "yahoo_ticker", "currency", "confidence"]
+    cols = [c for c in ["deck_ticker", "yahoo_ticker", "currency", "confidence"] if c in proposals]
     print("\n", proposals[cols].to_string(index=False))
+    errors = proposals[proposals["reason"].astype(str).str.startswith("ERROR")]
+    if len(errors):
+        print(f"\n{len(errors)} ETFs failed. First error:\n{errors['reason'].iloc[0][:300]}")
     print(f"\nSaved to {out}")
     print('Next: check each row, write "yes" in the "approved" column, then run scripts/apply_tickers.py')

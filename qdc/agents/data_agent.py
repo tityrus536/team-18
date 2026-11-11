@@ -1,91 +1,57 @@
 """Data agent.
 
 Job 1, with AI (one-off): find the best Yahoo ticker for each ETF from its ISIN.
-    The LLM searches Yahoo, inspects the listings and proposes one, with a reason.
-    Nothing changes in config/etf_universe.csv until a human approves the proposal.
+    1. Python searches Yahoo and collects the facts on every candidate listing
+       (no LLM, so no quota used).
+    2. The LLM compares the candidates and chooses, for 10 ETFs per request.
+       45 ETFs = about 5 requests, which fits the free Gemini quota.
+    3. Nothing changes in config/etf_universe.csv until a human approves.
 
 Job 2, without AI (every day): check the quality of the downloaded prices
     and tell the other agents which ETFs are usable (data_node).
 """
 from __future__ import annotations
 
+import json
 import time
 from typing import Literal
 
 import pandas as pd
-from langchain.agents import create_agent
-from langchain_core.tools import tool
 from pydantic import BaseModel, Field
 
-from qdc.data import UNIVERSE_FILE, load_prices, load_universe
+from qdc.data import ROOT, load_prices, load_universe
 from qdc.quality import quality_report
 
-# ---------------------------------------------------------------- Job 1: find tickers
+CANDIDATES_FILE = ROOT / "outputs" / "ticker_candidates.json"
+MAX_CANDIDATES = 5
+
+# ---------------------------------------------------------------- Job 1a: collect candidates (Python)
 
 
-class TickerChoice(BaseModel):
-    deck_ticker: str
-    isin: str
-    yahoo_ticker: str | None = Field(description="Chosen Yahoo symbol, or null if no listing matches")
-    exchange: str | None
-    currency: str | None = Field(description="Currency exactly as Yahoo reports it, e.g. EUR, USD, GBp")
-    confidence: Literal["high", "medium", "low"]
-    reason: str = Field(description="Why this listing: name match, currency, history, volume")
-    alternatives: list[str] = Field(description="Other matching symbols, if any")
-
-
-SYSTEM_PROMPT = """You are the Data agent of a student investment team.
-Your job: find the best Yahoo Finance listing for one ETF, given its ISIN and name.
-
-Steps:
-1. Call search_yahoo_listings with the ISIN. If nothing useful comes back,
-   search with the fund name instead.
-2. Call inspect_listing on the promising symbols (at most 4).
-3. Choose ONE listing:
-   - the name must match the fund (same issuer, same index, same share class:
-     Acc/Dist, currency-hedged or not). If unsure, say so.
-   - prefer a EUR listing on Xetra (.DE) or Euronext (.AS, .PA, .BR, .MI)
-   - then prefer the longest price history and the higher trading volume
-   - use a USD or GBP listing only if no good EUR listing exists
-4. Never invent a symbol: choose only among symbols returned by your tools.
-   If no listing matches, return yahoo_ticker = null with confidence low.
-Confidence: high = name clearly matches and data looks complete;
-medium = small doubt (share class, short history); low = no clear match."""
-
-
-@tool
-def search_yahoo_listings(query: str) -> list[dict]:
-    """Search Yahoo Finance by ISIN or fund name. Returns the listings found (symbol, name, exchange, type)."""
+def search_yahoo(query: str) -> list[dict]:
+    """Listings Yahoo returns for an ISIN or a fund name."""
     import yfinance as yf
 
-    try:
-        quotes = yf.Search(query, max_results=10, news_count=0).quotes
-    except Exception as e:  # network or Yahoo error: tell the agent instead of crashing
-        return [{"error": str(e)}]
+    quotes = yf.Search(query, max_results=10, news_count=0).quotes
     return [
-        {
-            "symbol": q.get("symbol"),
-            "name": q.get("longname") or q.get("shortname"),
-            "exchange": q.get("exchDisp") or q.get("exchange"),
-            "type": q.get("quoteType"),
-        }
-        for q in quotes
+        {"symbol": q.get("symbol"), "name": q.get("longname") or q.get("shortname"),
+         "exchange": q.get("exchDisp") or q.get("exchange"), "type": q.get("quoteType")}
+        for q in quotes if q.get("symbol")
     ]
 
 
-@tool
 def inspect_listing(symbol: str) -> dict:
-    """Facts about one Yahoo listing: full name, currency, first and last price date, average daily volume."""
+    """Facts about one listing: name, currency, price history, volume."""
     import yfinance as yf
 
-    try:
-        t = yf.Ticker(symbol)
-        hist = t.history(period="max", auto_adjust=False)
-        info = t.info or {}
-    except Exception as e:
-        return {"symbol": symbol, "error": str(e)}
+    t = yf.Ticker(symbol)
+    hist = t.history(period="max", auto_adjust=False)
     if hist.empty:
         return {"symbol": symbol, "error": "no price history"}
+    try:
+        info = t.info or {}
+    except Exception:
+        info = {}
     return {
         "symbol": symbol,
         "name": info.get("longName") or info.get("shortName"),
@@ -98,42 +64,118 @@ def inspect_listing(symbol: str) -> dict:
     }
 
 
-def find_ticker(etf: pd.Series, llm) -> TickerChoice:
-    """Run the agent for one ETF."""
-    agent = create_agent(
-        llm,
-        tools=[search_yahoo_listings, inspect_listing],
-        system_prompt=SYSTEM_PROMPT,
-        response_format=TickerChoice,
+def collect_candidates(etf: pd.Series, pause_seconds: float = 0.5) -> list[dict]:
+    """Search by ISIN (then by name if nothing found) and inspect up to MAX_CANDIDATES listings."""
+    try:
+        found = search_yahoo(etf["isin"]) or search_yahoo(etf["name"])
+    except Exception as e:
+        return [{"error": f"Yahoo search failed: {e}"}]
+    candidates = []
+    for listing in found[:MAX_CANDIDATES]:
+        try:
+            candidates.append({**listing, **inspect_listing(listing["symbol"])})
+        except Exception as e:
+            candidates.append({**listing, "error": str(e)})
+        time.sleep(pause_seconds)
+    return candidates
+
+
+# ---------------------------------------------------------------- Job 1b: choose (LLM)
+
+
+class TickerChoice(BaseModel):
+    deck_ticker: str
+    isin: str
+    yahoo_ticker: str | None = Field(description="Chosen symbol from the candidates, or null if none matches")
+    exchange: str | None
+    currency: str | None = Field(description="Currency exactly as in the candidate facts, e.g. EUR, USD, GBp")
+    confidence: Literal["high", "medium", "low"]
+    reason: str = Field(description="Why this listing: name match, currency, history, volume")
+    alternatives: list[str] = Field(description="Other candidate symbols that also match the fund")
+
+
+class TickerChoices(BaseModel):
+    choices: list[TickerChoice]
+
+
+SYSTEM_PROMPT = """You are the Data agent of a student investment team.
+For each ETF below, choose the best Yahoo Finance listing among its candidates.
+
+Rules:
+- The candidate's name must match the fund: same issuer, same index, same share
+  class (Acc/Dist, currency-hedged or not). If the candidates' names don't match
+  the fund, return yahoo_ticker = null.
+- Prefer a EUR listing on Xetra (.DE) or Euronext (.AS, .PA, .BR, .MI).
+- Then prefer the longest price history and the higher average volume.
+- Use a USD or GBP listing only if no good EUR listing exists.
+- Choose ONLY among the candidate symbols given. Never invent a symbol.
+- Copy currency and exchange from the chosen candidate's facts.
+Confidence: high = name clearly matches and data looks complete;
+medium = small doubt (share class, short history, low volume); low = no clear match.
+Return exactly one choice per ETF, in the same order."""
+
+
+def choose_listings(batch: list[dict], llm) -> list[TickerChoice]:
+    """One LLM request for a batch of ETFs and their candidates."""
+    prompt = json.dumps(batch, indent=1, default=str)
+    result = llm.with_structured_output(TickerChoices).invoke(
+        [("system", SYSTEM_PROMPT), ("user", f"ETFs and their candidate listings:\n{prompt}")]
     )
-    question = (
-        f"Find the Yahoo listing for: {etf['name']}\n"
-        f"ISIN: {etf['isin']}\nDeck ticker: {etf['deck_ticker']}\nTheme: {etf['theme']}"
-    )
-    return agent.invoke({"messages": [("user", question)]})["structured_response"]
+    return result.choices
 
 
-def run_ticker_finder(etfs: pd.DataFrame, llm=None, pause_seconds: float = 4.0) -> pd.DataFrame:
-    """Propose a ticker for each ETF. Errors on one ETF don't stop the others.
+def _error_row(etf: pd.Series, reason: str) -> dict:
+    return {"deck_ticker": etf["deck_ticker"], "isin": etf["isin"], "yahoo_ticker": None, "exchange": None,
+            "currency": None, "confidence": "low", "reason": reason, "alternatives": ""}
 
-    The pause keeps us under the free Gemini rate limit.
-    """
+
+def run_ticker_finder(etfs: pd.DataFrame, llm=None, batch_size: int = 10,
+                      pause_seconds: float = 5.0, collect=collect_candidates) -> pd.DataFrame:
+    """Propose a ticker for each ETF, using about len(etfs) / batch_size LLM requests."""
     from qdc.llm import get_llm
 
+    # 1. Python: collect candidates for every ETF (no LLM)
+    items = []
+    for i, (_, etf) in enumerate(etfs.iterrows()):
+        print(f"[{i + 1}/{len(etfs)}] searching Yahoo for {etf['deck_ticker']} ({etf['isin']})", flush=True)
+        items.append((etf, collect(etf)))
+    CANDIDATES_FILE.parent.mkdir(exist_ok=True)
+    CANDIDATES_FILE.write_text(json.dumps(
+        {etf["deck_ticker"]: c for etf, c in items}, indent=1, default=str))
+
+    # 2. LLM: choose, one request per batch
     llm = llm or get_llm()
     rows = []
-    for i, (_, etf) in enumerate(etfs.iterrows()):
-        print(f"[{i + 1}/{len(etfs)}] {etf['deck_ticker']} ({etf['isin']})", flush=True)
+    to_ask = []
+    for etf, c in items:
+        if any("symbol" in x and "error" not in x for x in c):
+            to_ask.append((etf, c))
+        else:
+            rows.append(_error_row(etf, "no usable Yahoo listing found: check justETF by hand"))
+
+    batches = [to_ask[i:i + batch_size] for i in range(0, len(to_ask), batch_size)]
+    for b, batch in enumerate(batches):
+        print(f"Asking the LLM to choose for batch {b + 1}/{len(batches)} ({len(batch)} ETFs)", flush=True)
+        payload = [{"deck_ticker": e["deck_ticker"], "isin": e["isin"], "fund_name": e["name"],
+                    "candidates": c} for e, c in batch]
         try:
-            choice = find_ticker(etf, llm).model_dump()
-            choice["alternatives"] = ", ".join(choice["alternatives"])
+            choices = {ch.deck_ticker: ch for ch in choose_listings(payload, llm)}
         except Exception as e:
-            choice = {"deck_ticker": etf["deck_ticker"], "isin": etf["isin"], "yahoo_ticker": None,
-                      "confidence": "low", "reason": f"ERROR: {e}"}
-        rows.append({**choice, "approved": ""})
-        if i < len(etfs) - 1:
+            rows += [_error_row(etf, f"ERROR: {e}") for etf, _ in batch]
+        else:
+            for etf, _ in batch:
+                ch = choices.get(etf["deck_ticker"])
+                if ch is None:
+                    rows.append(_error_row(etf, "ERROR: the LLM skipped this ETF"))
+                else:
+                    rows.append({**ch.model_dump(), "alternatives": ", ".join(ch.alternatives)})
+        if b < len(batches) - 1:
             time.sleep(pause_seconds)
-    return pd.DataFrame(rows)
+
+    order = {t: i for i, t in enumerate(etfs["deck_ticker"])}
+    out = pd.DataFrame(rows).sort_values("deck_ticker", key=lambda s: s.map(order)).reset_index(drop=True)
+    out["approved"] = ""
+    return out
 
 
 def apply_approved(proposals: pd.DataFrame, universe: pd.DataFrame) -> tuple[pd.DataFrame, list[str]]:
@@ -141,6 +183,8 @@ def apply_approved(proposals: pd.DataFrame, universe: pd.DataFrame) -> tuple[pd.
     ok = proposals["approved"].fillna("").astype(str).str.strip().str.lower().isin(["yes", "y", "x", "1", "oui"])
     approved = proposals[ok & proposals["yahoo_ticker"].notna()]
     u = universe.copy()
+    for col in ["yahoo_ticker", "exchange", "currency"]:
+        u[col] = u[col].astype(object)
     for _, p in approved.iterrows():
         mask = (u["deck_ticker"] == p["deck_ticker"]) & (u["isin"] == p["isin"])
         if not mask.any():
@@ -165,6 +209,3 @@ def data_node(state: dict) -> dict:
             "issues": {t: r["issues"] for t, r in report.iterrows() if r["issues"]},
         }
     }
-
-
-__all__ = ["run_ticker_finder", "apply_approved", "data_node", "UNIVERSE_FILE"]

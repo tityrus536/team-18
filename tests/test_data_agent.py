@@ -4,19 +4,12 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from langchain_core.language_models.fake_chat_models import GenericFakeChatModel
-from langchain_core.messages import AIMessage
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from qdc import quality  # noqa: E402
 from qdc.agents import data_agent  # noqa: E402
 
 DAYS = pd.bdate_range("2020-01-01", "2026-11-06")
-
-
-class FakeToolModel(GenericFakeChatModel):
-    def bind_tools(self, tools, **kwargs):
-        return self
 
 
 # ---------------------------------------------------------------- quality checks
@@ -56,36 +49,58 @@ def test_report_covers_etfs_without_ticker():
 
 # ---------------------------------------------------------------- ticker finder
 
-ETF = pd.Series({"deck_ticker": "NASDAQ", "isin": "IE00B53SZB19", "theme": "Equity / Tech",
-                 "name": "iShares NASDAQ 100 UCITS ETF USD (Acc)"})
+ETFS = pd.DataFrame([
+    {"deck_ticker": "NASDAQ", "isin": "IE00B53SZB19", "theme": "Equity / Tech",
+     "name": "iShares NASDAQ 100 UCITS ETF USD (Acc)"},
+    {"deck_ticker": "GHOST", "isin": "XX0000000000", "theme": "Test", "name": "Fund with no listing"},
+])
 
 
-def test_agent_returns_a_ticker_choice(monkeypatch):
-    calls = []
-    monkeypatch.setattr(data_agent.search_yahoo_listings, "func",
-                        lambda query: calls.append(query) or [{"symbol": "SXRV.DE", "name": "iShares NASDAQ 100"}])
-    choice = {"deck_ticker": "NASDAQ", "isin": "IE00B53SZB19", "yahoo_ticker": "SXRV.DE", "exchange": "XETRA",
-              "currency": "EUR", "confidence": "high", "reason": "Name matches, EUR listing", "alternatives": []}
-    fake = FakeToolModel(messages=iter([
-        AIMessage(content="", tool_calls=[{"name": "search_yahoo_listings", "args": {"query": "IE00B53SZB19"}, "id": "1"}]),
-        AIMessage(content="", tool_calls=[{"name": "TickerChoice", "args": choice, "id": "2"}]),
-    ]))
-    result = data_agent.find_ticker(ETF, fake)
-    assert calls == ["IE00B53SZB19"]
-    assert result.yahoo_ticker == "SXRV.DE"
+class FakeLLM:
+    """Acts like Gemini: records each request and returns fixed choices."""
+    def __init__(self, choices):
+        self.choices, self.requests = choices, []
+
+    def with_structured_output(self, schema):
+        return self
+
+    def invoke(self, messages):
+        self.requests.append(messages)
+        return data_agent.TickerChoices(choices=self.choices)
 
 
-def test_one_failing_etf_does_not_stop_the_others(monkeypatch):
-    def flaky(etf, llm):
-        if etf["deck_ticker"] == "BAD":
-            raise RuntimeError("503 high demand")
-        return data_agent.TickerChoice(deck_ticker=etf["deck_ticker"], isin=etf["isin"], yahoo_ticker="X.DE",
-                                       exchange="XETRA", currency="EUR", confidence="high", reason="ok",
-                                       alternatives=[])
-    monkeypatch.setattr(data_agent, "find_ticker", flaky)
-    etfs = pd.DataFrame([{**ETF, "deck_ticker": "BAD"}, ETF])
-    out = data_agent.run_ticker_finder(etfs, llm=object(), pause_seconds=0)
-    assert out.loc[0, "reason"].startswith("ERROR") and out.loc[1, "yahoo_ticker"] == "X.DE"
+def fake_collect(etf):
+    if etf["deck_ticker"] == "GHOST":
+        return []
+    return [{"symbol": "SXRV.DE", "name": "iShares NASDAQ 100", "currency": "EUR", "days_of_history": 2500}]
+
+
+def test_finder_uses_one_request_per_batch_and_skips_etfs_without_listing(monkeypatch, tmp_path):
+    monkeypatch.setattr(data_agent, "CANDIDATES_FILE", tmp_path / "candidates.json")
+    choice = data_agent.TickerChoice(deck_ticker="NASDAQ", isin="IE00B53SZB19", yahoo_ticker="SXRV.DE",
+                                     exchange="XETRA", currency="EUR", confidence="high",
+                                     reason="Name matches, EUR listing", alternatives=[])
+    fake = FakeLLM([choice])
+    out = data_agent.run_ticker_finder(ETFS, llm=fake, pause_seconds=0, collect=fake_collect)
+
+    assert len(fake.requests) == 1                      # one request for the whole batch
+    assert "GHOST" not in fake.requests[0][1][1]        # nothing to choose: not sent to the LLM
+    assert list(out["deck_ticker"]) == ["NASDAQ", "GHOST"]
+    assert out.loc[0, "yahoo_ticker"] == "SXRV.DE"
+    assert pd.isna(out.loc[1, "yahoo_ticker"]) and "justETF" in out.loc[1, "reason"]
+    assert (tmp_path / "candidates.json").exists()      # candidates saved for human review
+
+
+def test_llm_error_is_recorded_not_crashing(monkeypatch, tmp_path):
+    monkeypatch.setattr(data_agent, "CANDIDATES_FILE", tmp_path / "candidates.json")
+
+    class Broken(FakeLLM):
+        def invoke(self, messages):
+            raise RuntimeError("429 RESOURCE_EXHAUSTED")
+
+    out = data_agent.run_ticker_finder(ETFS, llm=Broken([]), pause_seconds=0, collect=fake_collect)
+    row = out[out.deck_ticker == "NASDAQ"].iloc[0]
+    assert row["reason"].startswith("ERROR") and "currency" in out.columns
 
 
 def test_only_approved_proposals_are_applied():
