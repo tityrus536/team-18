@@ -1,0 +1,21 @@
+# Secrets
+.env
+
+# Data and outputs (large or regenerated: share exports via the Drive)
+data/*
+!data/.gitkeep
+outputs/*
+!outputs/.gitkeep
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ipynb_checkpoints/
+
+# Editors and OS
+.vscode/
+.idea/
+.DS_Store
