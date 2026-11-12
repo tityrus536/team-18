@@ -3,7 +3,7 @@
 Run from the project root:
     python scripts/run_pipeline.py                                  # placeholders only, no API key needed
     python scripts/run_pipeline.py --real technical                 # real Technical agent, others placeholders
-    python scripts/run_pipeline.py --real data options risk --no-llm  # real agents that work without Gemini
+    python scripts/run_pipeline.py --real data options risk challenger --no-llm  # all agents that work without Gemini
 
 The final state is also saved to outputs/run_<as_of>.json for the Decision Log.
 """
@@ -20,10 +20,10 @@ from qdc.agents.graph import build_graph  # noqa: E402
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--as-of", default=None)
-    parser.add_argument("--real", nargs="*", default=[], choices=["data", "technical", "options", "risk"],
+    parser.add_argument("--real", nargs="*", default=[], choices=["data", "technical", "options", "risk", "challenger"],
                         help="agents to run for real")
     parser.add_argument("--no-llm", action="store_true",
-                        help="agents that can work without Gemini do so (Options writes its text by rules)")
+                        help="agents that can work without Gemini do so (Options and Challenger write by rules)")
     args = parser.parse_args()
 
     real = {}
@@ -39,6 +39,9 @@ if __name__ == "__main__":
     if "risk" in args.real:
         from qdc.agents.risk import risk_node
         real["risk"] = risk_node
+    if "challenger" in args.real:
+        from qdc.agents.challenger import challenger_node, challenger_node_no_llm
+        real["challenger"] = challenger_node_no_llm if args.no_llm else challenger_node
 
     app = build_graph(real)
     result = app.invoke({"as_of": args.as_of, "portfolio": {"cash_eur": 10_000, "holdings": {}}})
