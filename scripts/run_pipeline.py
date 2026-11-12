@@ -16,7 +16,8 @@ from qdc.agents.graph import build_graph  # noqa: E402
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--as-of", default=None)
-    parser.add_argument("--real", nargs="*", default=[], choices=["data", "technical"], help="agents to run for real")
+    parser.add_argument("--real", nargs="*", default=[], choices=["data", "technical", "risk"],
+                        help="agents to run for real")
     args = parser.parse_args()
 
     real = {}
@@ -26,6 +27,9 @@ if __name__ == "__main__":
     if "technical" in args.real:
         from qdc.agents.technical import technical_node
         real["technical"] = technical_node
+    if "risk" in args.real:
+        from qdc.agents.risk import risk_node
+        real["risk"] = risk_node
 
     app = build_graph(real)
     result = app.invoke({"as_of": args.as_of, "portfolio": {"cash_eur": 10_000, "holdings": {}}})

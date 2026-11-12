@@ -19,8 +19,12 @@ def macro_placeholder(state: dict) -> dict:
 
 
 def options_placeholder(state: dict) -> dict:
+    # Format the real agent must follow: target weights (fractions adding up to 1, "CASH" allowed).
+    # These weights are an example to exercise the Risk agent, not advice.
     return {
-        "proposals": [{"name": "placeholder", "orders": [], "rationale": ""}],
+        "proposals": [{"name": "placeholder balanced", "orders": [], "rationale": "",
+                       "weights": {"WORLD": 0.30, "S&P 500": 0.15, "EURO STOXX 50": 0.15,
+                                   "EMMKT": 0.10, "GLOBAL AGG BOND": 0.20, "CASH": 0.10}}],
         "revisions": state.get("revisions", -1) + 1,  # 0 on the first pass, +1 each time Risk sends it back
     }
 

@@ -26,11 +26,11 @@ Data -> Technical + Macro (in parallel) -> Portfolio Options -> Risk -> Challeng
 
 | Agent | File | Status | Owner |
 |---|---|---|---|
-| Data | `qdc/agents/data_agent.py` | **Working**: finds tickers (AI) + quality checks | |
+| Data | `qdc/agents/data_agent.py` | **Working**: finds tickers (AI or `--no-llm` rules) + quality checks | |
 | Technical | `qdc/agents/technical.py` | **Working first version** | |
 | Macro/News | placeholder | To build | |
 | Portfolio Options | placeholder | To build | |
-| Risk | placeholder | To build | |
+| Risk | `qdc/agents/risk.py` | **Working**: plain Python, checks options against `config/rules.yaml` | |
 | Challenger | placeholder | To build | |
 
 ## Setup (once, about 15 minutes)
@@ -63,6 +63,7 @@ python scripts/run_technical_agent.py                 # Technical agent on the l
 python scripts/run_technical_agent.py --as-of 2026-10-30   # as if it were that date
 python scripts/run_pipeline.py                        # whole workflow, placeholders only
 python scripts/run_pipeline.py --real data technical  # whole workflow, real Data and Technical agents
+python scripts/run_pipeline.py --real data risk       # real Data and Risk agents, no Gemini needed
 ```
 
 Reports are saved in `outputs/`. Copy the ones you use to the Drive.
@@ -104,7 +105,8 @@ You can also fill a ticker by hand in `config/etf_universe.csv`
 ## Project structure
 
 ```
-config/etf_universe.csv   the 50 ETFs from the Belfius deck (27 Oct), tickers filled so far
+config/etf_universe.csv   the 50 ETFs from the Belfius deck (27 Oct), with their Yahoo tickers
+config/rules.yaml         portfolio limits for Risk (team assumptions until we have the Belfius rules)
 qdc/data.py               download, EUR conversion, load prices cut at as_of
 qdc/indicators.py         returns, volatility, drawdown, trend, momentum ranking
 qdc/quality.py            data quality checks
@@ -112,6 +114,7 @@ qdc/llm.py                the model the whole team uses
 qdc/agents/state.py       the shared state
 qdc/agents/data_agent.py  the Data agent
 qdc/agents/technical.py   the Technical agent
+qdc/agents/risk.py        the Risk agent
 qdc/agents/placeholders.py fake agents until the real ones exist
 qdc/agents/graph.py       all agents connected with LangGraph
 scripts/                  commands to run
