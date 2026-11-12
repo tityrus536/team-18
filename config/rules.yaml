@@ -52,3 +52,28 @@ theme_tiers:
   Defensive sector: Core
   Digital assets: High
   Leveraged & inverse: Very high
+
+# ---------------------------------------------------------------- Portfolio Options
+# How much of the portfolio each profile puts in each risk tier (fractions, add up to 1).
+# Money a tier can't use (not enough ETFs with a good signal) goes to bonds, then CASH.
+# Team assumptions: tune them.
+profiles:
+  Defensive:
+    Defensive: 0.50
+    Core: 0.40
+    Elevated: 0.10
+  Balanced:
+    Defensive: 0.25
+    Core: 0.45
+    Elevated: 0.20
+    High: 0.10
+  Dynamic:
+    Defensive: 0.10
+    Core: 0.35
+    Elevated: 0.30
+    High: 0.20
+    Very high: 0.05
+
+trading:
+  min_order_eur: 100        # skip smaller orders (costs would eat them)
+  min_weight: 0.02          # don't open a position smaller than 2%

@@ -29,7 +29,7 @@ Data -> Technical + Macro (in parallel) -> Portfolio Options -> Risk -> Challeng
 | Data | `qdc/agents/data_agent.py` | **Working**: finds tickers (AI or `--no-llm` rules) + quality checks | |
 | Technical | `qdc/agents/technical.py` | **Working first version** | |
 | Macro/News | placeholder | To build | |
-| Portfolio Options | placeholder | To build | |
+| Portfolio Options | `qdc/agents/options.py` | **Working**: Python builds 3 options + orders, LLM explains (1 request) | |
 | Risk | `qdc/agents/risk.py` | **Working**: plain Python, checks options against `config/rules.yaml` | |
 | Challenger | placeholder | To build | |
 
@@ -63,10 +63,10 @@ python scripts/run_technical_agent.py                 # Technical agent on the l
 python scripts/run_technical_agent.py --as-of 2026-10-30   # as if it were that date
 python scripts/run_pipeline.py                        # whole workflow, placeholders only
 python scripts/run_pipeline.py --real data technical  # whole workflow, real Data and Technical agents
-python scripts/run_pipeline.py --real data risk       # real Data and Risk agents, no Gemini needed
+python scripts/run_pipeline.py --real data options risk --no-llm   # real Data, Options, Risk, no Gemini needed
 ```
 
-Reports are saved in `outputs/`. Copy the ones you use to the Drive.
+Reports are saved in `outputs/` (each pipeline run in `outputs/run_<date>.json`). Copy the ones you use to the Drive.
 
 ## Adding ETFs: the Data agent
 
@@ -114,6 +114,7 @@ qdc/llm.py                the model the whole team uses
 qdc/agents/state.py       the shared state
 qdc/agents/data_agent.py  the Data agent
 qdc/agents/technical.py   the Technical agent
+qdc/agents/options.py     the Portfolio Options agent
 qdc/agents/risk.py        the Risk agent
 qdc/agents/placeholders.py fake agents until the real ones exist
 qdc/agents/graph.py       all agents connected with LangGraph
