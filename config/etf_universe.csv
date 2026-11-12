@@ -42,7 +42,7 @@ number,theme,deck_ticker,isin,name,exposure_factor,yahoo_ticker,exchange,currenc
 41,Defensive sector,DEFENSE,IE000YYE6WK5,VanEck Defense UCITS ETF A,1,DFNS.L,LSE,USD
 42,Defensive sector,STAPLES,IE00BM67HN09,Xtrackers MSCI World Consumer Staples UCITS ETF 1C,1,XDWS.L,LSE,USD
 43,Digital assets,BITCOIN,XS2940466316,iShares Bitcoin ETP,1,BTCN.AS,Amsterdam,USD
-44,Digital assets,CRYPTO EQUITY,IE00BMDKNW35,VanEck Crypto and Blockchain Innovators UCITS ETF USD (Acc),1,DAGB.L,LSE,GBP
+44,Digital assets,CRYPTO EQUITY,IE00BMDKNW35,VanEck Crypto and Blockchain Innovators UCITS ETF USD (Acc),1,DAVV.DE,XETRA,EUR
 45,Leveraged & inverse,STOXX SHORT,FR0010424143,Amundi EURO STOXX 50 Daily (-2x) Inverse UCITS ETF Acc,-2,BXX.PA,Paris,EUR
 46,Leveraged & inverse,COPPER LVG,IE00B8JVMZ80,WisdomTree Copper 3x Daily Leveraged,3,3HCL.L,LSE,USD
 47,Leveraged & inverse,PALLADIUM LVG,IE00B94QLN63,WisdomTree Palladium 2x Daily Leveraged,2,2PAL.L,LSE,USD

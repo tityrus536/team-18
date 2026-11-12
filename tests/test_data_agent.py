@@ -138,3 +138,29 @@ def test_rules_prefer_eur_on_xetra_and_use_no_llm(monkeypatch, tmp_path):
     assert "OLD.DE" not in row["alternatives"]       # delisted listing dropped
     assert row["confidence"] == "high"
     assert pd.isna(out[out.deck_ticker == "GHOST"].iloc[0]["yahoo_ticker"])
+
+
+# ---------------------------------------------------------------- price cleaning
+
+from qdc.data import clean_prices  # noqa: E402
+
+
+def test_unadjusted_split_is_rescaled():
+    s = pd.Series([350.0, 351.0, 350.1, 4.43, 4.48], index=DAYS[:5])
+    clean, notes = clean_prices(s)
+    assert clean.pct_change().abs().max() < 0.02 and "split" in notes[0]
+    assert clean.iloc[-1] == 4.48                       # recent prices unchanged
+
+
+def test_bad_tick_removed_but_real_crash_kept():
+    spike = pd.Series([23.6, 23.4, 94.07, 23.06, 22.5], index=DAYS[:5])
+    clean, notes = clean_prices(spike)
+    assert pd.isna(clean.iloc[2]) and "bad price" in notes[0]
+    crash = pd.Series([21.5, 21.0, 7.5, 7.65, 7.7], index=DAYS[:5])   # -64% on a 3x ETF: real
+    assert clean_prices(crash)[1] == []
+
+
+def test_old_flat_run_is_not_stale_today():
+    s = pd.Series(np.linspace(100, 150, len(DAYS)), index=DAYS)
+    s.iloc[500:507] = s.iloc[500]                       # 7 flat days years ago (old Yahoo gap)
+    assert quality.check_etf(s, DAYS[-1])["status"] == "ok"

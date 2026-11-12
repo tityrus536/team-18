@@ -13,7 +13,8 @@ import pandas as pd
 
 MIN_YEARS = 3.0          # team assumption, not a competition rule
 MAX_MISSING = 0.05       # exchanges have different holidays, so a few % is normal
-MAX_STALE_RUN = 5        # same price 5 days in a row is suspicious
+MAX_STALE_RUN = 5        # same price 5 days in a row is suspicious...
+STALE_LOOKBACK = 63      # ...in the last 3 months (old Yahoo gaps don't make an ETF unusable today)
 MAX_DAYS_SINCE_LAST = 5  # calendar days between the as_of date and the last price
 BASE_MOVE_LIMIT = 0.15   # daily move limit for a normal ETF, scaled by leverage
 
@@ -41,6 +42,7 @@ def check_etf(prices: pd.Series, as_of: pd.Timestamp, exposure_factor: float = 1
         "years_of_history": round(years, 1),
         "missing_pct": round(float(s.isna().mean()), 4),
         "longest_flat_run_days": _longest_flat_run(valid),
+        "recent_flat_run_days": _longest_flat_run(valid.iloc[-STALE_LOOKBACK:]),
         "max_daily_move": round(float(valid.pct_change().abs().max()), 4),
         "days_since_last_price": int((as_of - valid.index[-1]).days),
     }
@@ -50,8 +52,8 @@ def check_etf(prices: pd.Series, as_of: pd.Timestamp, exposure_factor: float = 1
         issues.append(("short_history", f"only {years:.1f} years of prices"))
     if facts["missing_pct"] > MAX_MISSING:
         issues.append(("gaps", f"{facts['missing_pct']:.1%} of days missing"))
-    if facts["longest_flat_run_days"] >= MAX_STALE_RUN:
-        issues.append(("stale", f"same price {facts['longest_flat_run_days']} days in a row"))
+    if facts["recent_flat_run_days"] >= MAX_STALE_RUN:
+        issues.append(("stale", f"same price {facts['recent_flat_run_days']} days in a row in the last 3 months"))
     if facts["days_since_last_price"] > MAX_DAYS_SINCE_LAST:
         issues.append(("stale", f"last price is {facts['days_since_last_price']} days old"))
     if facts["max_daily_move"] > move_limit:

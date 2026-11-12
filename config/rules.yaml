@@ -1,0 +1,79 @@
+# Portfolio rules read by the Risk agent (qdc/agents/risk.py), and later by Portfolio Options.
+#
+# EVERY NUMBER BELOW IS A TEAM ASSUMPTION, NOT A COMPETITION RULE.
+# Replace them with the Belfius x QTEM rules when you have them, and note the
+# source next to each value. Weights are fractions: 0.30 = 30% of the portfolio.
+
+starting_capital_eur: 10000          # TODO: check the deck
+
+# Hard limits: breaking one makes the option "fail" (sent back to Portfolio Options).
+limits:
+  max_position_by_tier:              # largest weight for one ETF, by its risk tier
+    Core: 0.30
+    Defensive: 0.30
+    Elevated: 0.15
+    High: 0.10
+    Very high: 0.05
+  max_total_by_tier:                 # all ETFs of that tier together
+    High: 0.25
+    Very high: 0.10
+  max_theme: 0.40                    # all ETFs of one theme together
+  max_cash: 0.50                     # CASH weight (uninvested money)
+  max_volatility: 0.25               # annualised portfolio volatility, last 12 months
+  weight_tolerance: 0.01             # weights must add up to 1 within this
+
+# Soft limits: breaking one gives a "warning" (shown to the humans, not sent back).
+warnings:
+  volatility_above: 0.18             # annualised
+  drawdown_12m_below: -0.20          # portfolio max drawdown over 12 months
+  min_positions: 4                   # fewer ETFs than this = concentrated
+  min_history_years: 3.0             # holding an ETF with a shorter history
+
+# Risk tier of each theme: from QDC_ETF_Universe.xlsx (Themes sheet), a preliminary
+# judgement. Update it after looking at the volatility and drawdowns.
+theme_tiers:
+  Global equity (benchmark): Core
+  US equity: Core
+  European equity: Core
+  Home market: Core
+  Size & style factors: Core
+  Income strategies: Elevated
+  Equity / Tech: Elevated
+  Frontier tech: High
+  Financials: Elevated
+  Health care: Core
+  Emerging markets: Elevated
+  Energy & commodities: Elevated
+  Energy transition: High
+  Industrial & strategic metals: High
+  Precious metals: Elevated
+  Fixed income / Bonds: Defensive
+  Money market (cash): Defensive
+  Defensive sector: Core
+  Digital assets: High
+  Leveraged & inverse: Very high
+
+# ---------------------------------------------------------------- Portfolio Options
+# How much of the portfolio each profile puts in each risk tier (fractions, add up to 1).
+# Money a tier can't use (not enough ETFs with a good signal) goes to bonds, then CASH.
+# Team assumptions: tune them.
+profiles:
+  Defensive:
+    Defensive: 0.50
+    Core: 0.40
+    Elevated: 0.10
+  Balanced:
+    Defensive: 0.25
+    Core: 0.45
+    Elevated: 0.20
+    High: 0.10
+  Dynamic:
+    Defensive: 0.10
+    Core: 0.35
+    Elevated: 0.30
+    High: 0.20
+    Very high: 0.05
+
+trading:
+  min_order_eur: 100        # skip smaller orders (costs would eat them)
+  min_weight: 0.02          # don't open a position smaller than 2%

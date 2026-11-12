@@ -37,6 +37,35 @@ def _field(data: pd.DataFrame, field: str) -> pd.DataFrame:
     return data[[field]]
 
 
+SPLIT_RATIO = 5.0     # a one-day price ratio this large is a share split, not a market move
+SPIKE_MOVE = 0.40     # a one-day move this large that reverses the next day is a bad tick
+SPIKE_REVERT = 0.15   # "reverses" = next price within 15% of the price before the spike
+
+
+def clean_prices(s: pd.Series) -> tuple[pd.Series, list[str]]:
+    """Fix the two Yahoo errors that break volatility and drawdowns. Returns (series, notes).
+
+    - unadjusted split: the price jumps by SPLIT_RATIO or more and stays there,
+      so all earlier prices are rescaled to the new level
+    - bad tick: one price far from both its neighbours, so it is removed
+    Real crashes (e.g. -64% on a 3x ETF) are below SPLIT_RATIO and are kept.
+    """
+    s = s.copy()
+    notes = []
+    valid = s.dropna()
+    for i in range(1, len(valid) - 1):
+        prev, cur, nxt = valid.iloc[i - 1], valid.iloc[i], valid.iloc[i + 1]
+        if abs(cur / prev - 1) > SPIKE_MOVE and abs(nxt / prev - 1) < SPIKE_REVERT:
+            s.loc[valid.index[i]] = float("nan")
+            notes.append(f"removed bad price {cur:.4g} on {valid.index[i].date()}")
+    valid = s.dropna()
+    ratio = valid / valid.shift(1)
+    for day, r in ratio[(ratio >= SPLIT_RATIO) | (ratio <= 1 / SPLIT_RATIO)].items():
+        s.loc[:day - pd.Timedelta(days=1)] *= r
+        notes.append(f"adjusted split (x{1 / r:.4g}) on {day.date()}")
+    return s, notes
+
+
 def download_prices(start: str = "2015-01-01") -> pd.DataFrame:
     """Download adjusted closes for all filled tickers, convert to EUR and save.
 
@@ -49,9 +78,16 @@ def download_prices(start: str = "2015-01-01") -> pd.DataFrame:
     DATA_DIR.mkdir(exist_ok=True)
 
     raw = yf.download(tickers, start=start, auto_adjust=False, progress=False)
-    raw.to_parquet(DATA_DIR / f"raw_prices_{pd.Timestamp.today().date()}.parquet")
+    adj = _field(raw, "Adj Close").copy()
+    # Yahoo's batch download sometimes drops a ticker at random: retry those one by one
+    for t in [t for t in tickers if t not in adj or adj[t].isna().all()]:
+        print(f"{t}: empty in batch download, retrying alone")
+        one = yf.download(t, start=start, auto_adjust=False, progress=False, multi_level_index=False)
+        if not one.empty:
+            adj[t] = one["Adj Close"]
+    adj.to_parquet(DATA_DIR / f"raw_prices_{pd.Timestamp.today().date()}.parquet")
 
-    adj = _field(raw, "Adj Close").dropna(how="all")
+    adj = adj.dropna(how="all")
     fx_raw = yf.download(list(FX_TICKERS.values()), start=start, auto_adjust=False, progress=False)
     fx = _field(fx_raw, "Close").reindex(adj.index).ffill(limit=3)  # past rates only
 
@@ -65,6 +101,9 @@ def download_prices(start: str = "2015-01-01") -> pd.DataFrame:
             series = series / fx[FX_TICKERS[ccy]]
         elif ccy != "EUR":
             raise ValueError(f"{row['deck_ticker']}: unknown currency {ccy!r}")
+        series, notes = clean_prices(series)
+        for note in notes:
+            print(f"{row['deck_ticker']}: {note}")
         eur[row["deck_ticker"]] = series
 
     eur.to_parquet(PRICES_FILE)
