@@ -67,15 +67,17 @@ def inspect_listing(symbol: str) -> dict:
 def collect_candidates(etf: pd.Series, pause_seconds: float = 0.5) -> list[dict]:
     """Search by ISIN (then by name if nothing found) and inspect up to MAX_CANDIDATES listings."""
     try:
-        found = search_yahoo(etf["isin"]) or search_yahoo(etf["name"])
+        found, found_by = search_yahoo(etf["isin"]), "isin"
+        if not found:
+            found, found_by = search_yahoo(etf["name"]), "name"
     except Exception as e:
         return [{"error": f"Yahoo search failed: {e}"}]
     candidates = []
     for listing in found[:MAX_CANDIDATES]:
         try:
-            candidates.append({**listing, **inspect_listing(listing["symbol"])})
+            candidates.append({**listing, **inspect_listing(listing["symbol"]), "found_by": found_by})
         except Exception as e:
-            candidates.append({**listing, "error": str(e)})
+            candidates.append({**listing, "error": str(e), "found_by": found_by})
         time.sleep(pause_seconds)
     return candidates
 
@@ -124,14 +126,57 @@ def choose_listings(batch: list[dict], llm) -> list[TickerChoice]:
     return result.choices
 
 
+# ---------------------------------------------------------------- Job 1b bis: choose without LLM (rules)
+
+PREFERRED_EXCHANGES = (".DE", ".AS", ".PA", ".BR", ".MI")  # Xetra, Euronext
+CURRENCY_RANK = {"EUR": 0, "USD": 1, "GBP": 2, "GBp": 2}   # the currencies qdc.data can convert
+MIN_DAYS_HIGH = 3 * 252                                     # history needed for "high" confidence
+MAX_STALE_DAYS = 30                                         # older last price = listing probably dead
+
+
+def choose_by_rules(etf: pd.Series, candidates: list[dict]) -> dict:
+    """Same preferences as the LLM prompt, applied in Python: no quota used.
+
+    Cannot check share class (Acc/Dist, hedged) from names, so confidence is never
+    above "medium" when the listing was found by fund name instead of ISIN.
+    """
+    ok = [c for c in candidates if c.get("symbol") and "error" not in c and c.get("currency") in CURRENCY_RANK]
+    if not ok:
+        return _error_row(etf, "no Yahoo listing in EUR/USD/GBP with prices: check justETF by hand")
+    newest = max(pd.Timestamp(c["last_date"]) for c in ok)
+    alive = [c for c in ok if (newest - pd.Timestamp(c["last_date"])).days <= MAX_STALE_DAYS] or ok
+
+    def score(c):
+        return (CURRENCY_RANK[c["currency"]], not str(c["symbol"]).upper().endswith(PREFERRED_EXCHANGES),
+                -(c.get("days_of_history") or 0), -(c.get("avg_volume_3m") or 0))
+
+    alive.sort(key=score)
+    best = alive[0]
+    preferred = best["currency"] == "EUR" and str(best["symbol"]).upper().endswith(PREFERRED_EXCHANGES)
+    if best.get("found_by") == "name":
+        confidence = "low"
+    elif preferred and (best.get("days_of_history") or 0) >= MIN_DAYS_HIGH and (best.get("avg_volume_3m") or 0) > 0:
+        confidence = "high"
+    else:
+        confidence = "medium"
+    reason = (f"rules (no LLM): found by {best.get('found_by', '?')}, {best['currency']} on {best.get('exchange')}, "
+              f"{best.get('days_of_history')} days since {best.get('first_date')}, "
+              f"avg volume 3m {best.get('avg_volume_3m')}; Yahoo name: {best.get('name')}")
+    return {"deck_ticker": etf["deck_ticker"], "isin": etf["isin"], "yahoo_ticker": best["symbol"],
+            "exchange": best.get("exchange"), "currency": best["currency"], "confidence": confidence,
+            "reason": reason, "alternatives": ", ".join(c["symbol"] for c in alive[1:])}
+
+
 def _error_row(etf: pd.Series, reason: str) -> dict:
     return {"deck_ticker": etf["deck_ticker"], "isin": etf["isin"], "yahoo_ticker": None, "exchange": None,
             "currency": None, "confidence": "low", "reason": reason, "alternatives": ""}
 
 
 def run_ticker_finder(etfs: pd.DataFrame, llm=None, batch_size: int = 10,
-                      pause_seconds: float = 5.0, collect=collect_candidates) -> pd.DataFrame:
-    """Propose a ticker for each ETF, using about len(etfs) / batch_size LLM requests."""
+                      pause_seconds: float = 5.0, collect=collect_candidates,
+                      use_llm: bool = True) -> pd.DataFrame:
+    """Propose a ticker for each ETF, using about len(etfs) / batch_size LLM requests
+    (or none with use_llm=False: choose_by_rules picks instead)."""
     from qdc.llm import get_llm
 
     # 1. Python: collect candidates for every ETF (no LLM)
@@ -143,16 +188,19 @@ def run_ticker_finder(etfs: pd.DataFrame, llm=None, batch_size: int = 10,
     CANDIDATES_FILE.write_text(json.dumps(
         {etf["deck_ticker"]: c for etf, c in items}, indent=1, default=str))
 
-    # 2. LLM: choose, one request per batch
-    llm = llm or get_llm()
     rows = []
     to_ask = []
     for etf, c in items:
-        if any("symbol" in x and "error" not in x for x in c):
+        if not any("symbol" in x and "error" not in x for x in c):
+            rows.append(_error_row(etf, "no usable Yahoo listing found: check justETF by hand"))
+        elif use_llm:
             to_ask.append((etf, c))
         else:
-            rows.append(_error_row(etf, "no usable Yahoo listing found: check justETF by hand"))
+            rows.append(choose_by_rules(etf, c))
 
+    # 2. LLM: choose, one request per batch
+    if to_ask:
+        llm = llm or get_llm()
     batches = [to_ask[i:i + batch_size] for i in range(0, len(to_ask), batch_size)]
     for b, batch in enumerate(batches):
         print(f"Asking the LLM to choose for batch {b + 1}/{len(batches)} ({len(batch)} ETFs)", flush=True)

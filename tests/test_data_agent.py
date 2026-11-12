@@ -113,3 +113,28 @@ def test_only_approved_proposals_are_applied():
     assert updated == ["NASDAQ"]
     assert new.loc[new.deck_ticker == "NASDAQ", "yahoo_ticker"].item() == "SXRV.DE"
     assert pd.isna(new.loc[new.deck_ticker == "GOLD", "yahoo_ticker"].item())
+
+
+def test_rules_prefer_eur_on_xetra_and_use_no_llm(monkeypatch, tmp_path):
+    monkeypatch.setattr(data_agent, "CANDIDATES_FILE", tmp_path / "candidates.json")
+
+    def collect(etf):
+        if etf["deck_ticker"] == "GHOST":
+            return []
+        base = {"found_by": "isin", "first_date": "2010-01-04", "last_date": "2026-11-06", "avg_volume_3m": 5000}
+        return [{**base, "symbol": "CNDX.L", "currency": "USD", "exchange": "LSE", "days_of_history": 4000},
+                {**base, "symbol": "SXRV.F", "currency": "EUR", "exchange": "Frankfurt", "days_of_history": 3000},
+                {**base, "symbol": "SXRV.DE", "currency": "EUR", "exchange": "XETRA", "days_of_history": 2500},
+                {**base, "symbol": "OLD.DE", "currency": "EUR", "exchange": "XETRA", "days_of_history": 3500,
+                 "last_date": "2020-01-01"}]
+
+    class NoLLM(FakeLLM):
+        def invoke(self, messages):
+            raise AssertionError("the LLM must not be called")
+
+    out = data_agent.run_ticker_finder(ETFS, llm=NoLLM([]), pause_seconds=0, collect=collect, use_llm=False)
+    row = out[out.deck_ticker == "NASDAQ"].iloc[0]
+    assert row["yahoo_ticker"] == "SXRV.DE"          # EUR + Xetra beats longer USD and Frankfurt listings
+    assert "OLD.DE" not in row["alternatives"]       # delisted listing dropped
+    assert row["confidence"] == "high"
+    assert pd.isna(out[out.deck_ticker == "GHOST"].iloc[0]["yahoo_ticker"])

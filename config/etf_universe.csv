@@ -1,51 +1,51 @@
 number,theme,deck_ticker,isin,name,exposure_factor,yahoo_ticker,exchange,currency
 1,Global equity (benchmark),WORLD,IE00B4L5Y983,iShares Core MSCI World UCITS ETF USD (Acc),1,EUNL.DE,Xetra,EUR
-2,US equity,S&P 500,IE00B5BMR087,iShares Core S&P 500 UCITS ETF USD (Acc),1,,,
-3,European equity,EUROPE 600,LU0908500753,Amundi Core Stoxx Europe 600 UCITS ETF Acc,1,,,
-4,European equity,EURO STOXX 50,IE00B53L3W79,iShares Core EURO STOXX 50 UCITS ETF EUR (Acc),1,,,
-5,European equity,IBEX 35,FR0010655746,Amundi IBEX 35 UCITS ETF Acc,1,,,
-6,Home market,BEL 20,FR0000021842,Amundi BEL 20 UCITS ETF Dist,1,,,
-7,Size & style factors,WORLD SMALL CAP,IE00BF4RFH31,iShares MSCI World Small Cap UCITS ETF USD (Acc),1,,,
-8,Size & style factors,WORLD MIN VOL,IE00B8FHGS14,iShares Edge MSCI World Minimum Volatility UCITS ETF USD (Acc),1,,,
-9,Size & style factors,DIVIDEND LEADERS,NL0011683594,VanEck Morningstar Developed Markets Dividend Leaders UCITS ETF,1,,,
-10,Income strategies,NASDAQ INCOME,IE000U9J8HX9,NASDAQ Equity Premium Income Active UCITS ETF USD (Dist),1,,,
-11,Equity / Tech,NASDAQ,IE00B53SZB19,iShares NASDAQ 100 UCITS ETF USD (Acc),1,,,
+2,US equity,S&P 500,IE00B5BMR087,iShares Core S&P 500 UCITS ETF USD (Acc),1,CSSPX.MI,Milan,EUR
+3,European equity,EUROPE 600,LU0908500753,Amundi Core Stoxx Europe 600 UCITS ETF Acc,1,MEUD.PA,Paris,EUR
+4,European equity,EURO STOXX 50,IE00B53L3W79,iShares Core EURO STOXX 50 UCITS ETF EUR (Acc),1,SXRT.DE,XETRA,EUR
+5,European equity,IBEX 35,FR0010655746,Amundi IBEX 35 UCITS ETF Acc,1,CS1.PA,Paris,EUR
+6,Home market,BEL 20,FR0000021842,Amundi BEL 20 UCITS ETF Dist,1,BEL.BR,Brussels,EUR
+7,Size & style factors,WORLD SMALL CAP,IE00BF4RFH31,iShares MSCI World Small Cap UCITS ETF USD (Acc),1,WSML.L,LSE,USD
+8,Size & style factors,WORLD MIN VOL,IE00B8FHGS14,iShares Edge MSCI World Minimum Volatility UCITS ETF USD (Acc),1,MVOL.L,LSE,USD
+9,Size & style factors,DIVIDEND LEADERS,NL0011683594,VanEck Morningstar Developed Markets Dividend Leaders UCITS ETF,1,TDIV.AS,Amsterdam,EUR
+10,Income strategies,NASDAQ INCOME,IE000U9J8HX9,NASDAQ Equity Premium Income Active UCITS ETF USD (Dist),1,JEPQ.L,LSE,USD
+11,Equity / Tech,NASDAQ,IE00B53SZB19,iShares NASDAQ 100 UCITS ETF USD (Acc),1,CSNDX.SW,Swiss,USD
 12,Equity / Tech,SEMIS,IE000I8KRLL9,iShares MSCI Global Semiconductors UCITS ETF USD (Acc),1,SEMI.AS,Euronext Amsterdam,USD
-13,Equity / Tech,CYBERSEC,IE00BYPLS672,L&G Cyber Security UCITS ETF USD Acc,1,,,
-14,Equity / Tech,BIOTECH,IE00BQ70R696,Invesco NASDAQ Biotech UCITS ETF,1,,,
-15,Equity / Tech,ROBOTICS,IE00BYZK4552,iShares Automation & Robotics UCITS ETF USD (Acc),1,,,
-16,Frontier tech,SPACE,IE000YU9K6K2,VanEck Space Innovators UCITS ETF A USD (Acc),1,,,
-17,Frontier tech,QUANTUM,IE0007Y8Y157,VanEck Quantum Computing UCITS ETF A USD (Acc),1,,,
-18,Financials,EURO BANKS,LU1829219390,Amundi Euro Stoxx Banks UCITS ETF Acc,1,,,
-19,Health care,HEALTH CARE,IE00BM67HK77,Xtrackers MSCI World Health Care UCITS ETF 1C,1,,,
-20,Emerging markets,EMMKT,IE00BKM4GZ66,iShares Core MSCI Emerging Markets IMI UCITS ETF USD (Acc),1,,,
-21,Emerging markets,CHINA LC,IE00B02KXK85,iShares China Large Cap UCITS ETF (Dist),1,,,
-22,Emerging markets,INDIA,IE00BZCQB185,iShares MSCI India UCITS ETF USD (Acc),1,,,
-23,Emerging markets,KOREA,LU1900066975,Amundi MSCI Korea UCITS ETF Acc,1,,,
-24,Emerging markets,BRAZIL,IE00B0M63516,iShares MSCI Brazil UCITS ETF USD (Dist),1,,,
-25,Emerging markets,CHINA A,IE00BQT3WG13,iShares MSCI China A UCITS ETF USD (Acc),1,,,
-26,Energy & commodities,WORLD ENERGY,IE00BM67HM91,Xtrackers MSCI World Energy UCITS ETF 1C,1,,,
-27,Energy & commodities,OIL & GAS E&P,IE00B6R51Z18,iShares Oil & Gas Exploration & Production UCITS ETF USD (Acc),1,,,
-28,Energy transition,URANIUM,IE000M7V94E1,VanEck Uranium and Nuclear Technologies UCITS ETF A,1,,,
-29,Energy transition,CLEAN ENERGY,IE00BK5BCH80,L&G Clean Energy UCITS ETF USD (Acc),1,,,
-30,Energy transition,HYDROGEN,FR0010930644,Amundi Global Hydrogen UCITS ETF EUR (Acc),1,,,
-31,Industrial & strategic metals,COPPER MINERS,IE0003Z9E2Y3,Global X Copper Miners UCITS ETF USD (Acc),1,,,
-32,Industrial & strategic metals,RARE EARTHS,IE0002PG6CA6,VanEck Rare Earth and Strategic Metals UCITS ETF USD (Acc),1,,,
+13,Equity / Tech,CYBERSEC,IE00BYPLS672,L&G Cyber Security UCITS ETF USD Acc,1,USPY.L,LSE,USD
+14,Equity / Tech,BIOTECH,IE00BQ70R696,Invesco NASDAQ Biotech UCITS ETF,1,SBIO.L,LSE,USD
+15,Equity / Tech,ROBOTICS,IE00BYZK4552,iShares Automation & Robotics UCITS ETF USD (Acc),1,RBOT.L,LSE,USD
+16,Frontier tech,SPACE,IE000YU9K6K2,VanEck Space Innovators UCITS ETF A USD (Acc),1,JEDI.L,LSE,USD
+17,Frontier tech,QUANTUM,IE0007Y8Y157,VanEck Quantum Computing UCITS ETF A USD (Acc),1,QNTM.L,LSE,USD
+18,Financials,EURO BANKS,LU1829219390,Amundi Euro Stoxx Banks UCITS ETF Acc,1,BNKE.PA,Paris,EUR
+19,Health care,HEALTH CARE,IE00BM67HK77,Xtrackers MSCI World Health Care UCITS ETF 1C,1,XDWH.L,LSE,USD
+20,Emerging markets,EMMKT,IE00BKM4GZ66,iShares Core MSCI Emerging Markets IMI UCITS ETF USD (Acc),1,EIMI.L,LSE,USD
+21,Emerging markets,CHINA LC,IE00B02KXK85,iShares China Large Cap UCITS ETF (Dist),1,FXC.SW,Swiss,USD
+22,Emerging markets,INDIA,IE00BZCQB185,iShares MSCI India UCITS ETF USD (Acc),1,NDIA.L,LSE,USD
+23,Emerging markets,KOREA,LU1900066975,Amundi MSCI Korea UCITS ETF Acc,1,KRW.PA,Paris,EUR
+24,Emerging markets,BRAZIL,IE00B0M63516,iShares MSCI Brazil UCITS ETF USD (Dist),1,IBZL.L,LSE,GBp
+25,Emerging markets,CHINA A,IE00BQT3WG13,iShares MSCI China A UCITS ETF USD (Acc),1,36BZ.DE,XETRA,EUR
+26,Energy & commodities,WORLD ENERGY,IE00BM67HM91,Xtrackers MSCI World Energy UCITS ETF 1C,1,XDW0.L,LSE,USD
+27,Energy & commodities,OIL & GAS E&P,IE00B6R51Z18,iShares Oil & Gas Exploration & Production UCITS ETF USD (Acc),1,IOGP.L,LSE,USD
+28,Energy transition,URANIUM,IE000M7V94E1,VanEck Uranium and Nuclear Technologies UCITS ETF A,1,NUCL.L,LSE,USD
+29,Energy transition,CLEAN ENERGY,IE00BK5BCH80,L&G Clean Energy UCITS ETF USD (Acc),1,RENW.L,LSE,USD
+30,Energy transition,HYDROGEN,FR0010930644,Amundi Global Hydrogen UCITS ETF EUR (Acc),1,ANRJ.PA,Paris,EUR
+31,Industrial & strategic metals,COPPER MINERS,IE0003Z9E2Y3,Global X Copper Miners UCITS ETF USD (Acc),1,4COP.DE,XETRA,EUR
+32,Industrial & strategic metals,RARE EARTHS,IE0002PG6CA6,VanEck Rare Earth and Strategic Metals UCITS ETF USD (Acc),1,REMX.L,LSE,USD
 33,Precious metals,GOLD,IE00B4ND3602,iShares Physical Gold ETC,1,PPFB.DE,Xetra,EUR
-34,Precious metals,GOLD MINERS,IE00BQQP9F84,VanEck Gold Miners UCITS ETF,1,,,
-35,Precious metals,SILVER MINERS,IE000UL6CLP7,Global X Silver Miners UCITS ETF USD (Acc),1,,,
-36,Fixed income / Bonds,HIGHY BOND,LU1109942653,Xtrackers II EUR High Yield Corporate Bond UCITS ETF 1D,1,,,
-37,Fixed income / Bonds,US TREASURY 20Y,LU1407890620,Amundi US Treasury Bond Long Dated UCITS ETF (Dist),1,,,
-38,Fixed income / Bonds,GLOBAL AGG BOND,IE00BG47KH54,Vanguard Global Aggregate Bond UCITS ETF EUR Hedged (Acc),1,,,
+34,Precious metals,GOLD MINERS,IE00BQQP9F84,VanEck Gold Miners UCITS ETF,1,GDX.L,LSE,USD
+35,Precious metals,SILVER MINERS,IE000UL6CLP7,Global X Silver Miners UCITS ETF USD (Acc),1,SILV.L,LSE,USD
+36,Fixed income / Bonds,HIGHY BOND,LU1109942653,Xtrackers II EUR High Yield Corporate Bond UCITS ETF 1D,1,XHYG.DE,XETRA,EUR
+37,Fixed income / Bonds,US TREASURY 20Y,LU1407890620,Amundi US Treasury Bond Long Dated UCITS ETF (Dist),1,US10.PA,Paris,USD
+38,Fixed income / Bonds,GLOBAL AGG BOND,IE00BG47KH54,Vanguard Global Aggregate Bond UCITS ETF EUR Hedged (Acc),1,VAGF.MI,Milan,EUR
 39,Fixed income / Bonds,EUR GOVT BOND,IE00B4WXJJ64,iShares Core EUR Govt Bond UCITS ETF EUR (Dist),1,EUNH.DE,Xetra,EUR
-40,Money market (cash),OVERNIGHT CASH,LU1190417599,Amundi Smart Overnight Return UCITS ETF EUR (Acc),1,,,
-41,Defensive sector,DEFENSE,IE000YYE6WK5,VanEck Defense UCITS ETF A,1,,,
-42,Defensive sector,STAPLES,IE00BM67HN09,Xtrackers MSCI World Consumer Staples UCITS ETF 1C,1,,,
-43,Digital assets,BITCOIN,XS2940466316,iShares Bitcoin ETP,1,,,
-44,Digital assets,CRYPTO EQUITY,IE00BMDKNW35,VanEck Crypto and Blockchain Innovators UCITS ETF USD (Acc),1,,,
-45,Leveraged & inverse,STOXX SHORT,FR0010424143,Amundi EURO STOXX 50 Daily (-2x) Inverse UCITS ETF Acc,-2,,,
-46,Leveraged & inverse,COPPER LVG,IE00B8JVMZ80,WisdomTree Copper 3x Daily Leveraged,3,,,
-47,Leveraged & inverse,PALLADIUM LVG,IE00B94QLN63,WisdomTree Palladium 2x Daily Leveraged,2,,,
+40,Money market (cash),OVERNIGHT CASH,LU1190417599,Amundi Smart Overnight Return UCITS ETF EUR (Acc),1,CSH2.PA,Paris,EUR
+41,Defensive sector,DEFENSE,IE000YYE6WK5,VanEck Defense UCITS ETF A,1,DFNS.L,LSE,USD
+42,Defensive sector,STAPLES,IE00BM67HN09,Xtrackers MSCI World Consumer Staples UCITS ETF 1C,1,XDWS.L,LSE,USD
+43,Digital assets,BITCOIN,XS2940466316,iShares Bitcoin ETP,1,BTCN.AS,Amsterdam,USD
+44,Digital assets,CRYPTO EQUITY,IE00BMDKNW35,VanEck Crypto and Blockchain Innovators UCITS ETF USD (Acc),1,DAGB.L,LSE,GBP
+45,Leveraged & inverse,STOXX SHORT,FR0010424143,Amundi EURO STOXX 50 Daily (-2x) Inverse UCITS ETF Acc,-2,BXX.PA,Paris,EUR
+46,Leveraged & inverse,COPPER LVG,IE00B8JVMZ80,WisdomTree Copper 3x Daily Leveraged,3,3HCL.L,LSE,USD
+47,Leveraged & inverse,PALLADIUM LVG,IE00B94QLN63,WisdomTree Palladium 2x Daily Leveraged,2,2PAL.L,LSE,USD
 48,Leveraged & inverse,NASDAQ 3X,IE00BLRPRL42,WisdomTree NASDAQ 100 3x Daily Leveraged,3,QQQ3.L,London SE,USD
-49,Leveraged & inverse,S&P 500 SHORT,LU0322251520,Xtrackers S&P 500 Inverse Daily Swap UCITS ETF 1C,-1,,,
-50,Leveraged & inverse,EURO STOXX 2X,FR0010468983,Amundi EURO STOXX 50 Daily (2x) Leveraged UCITS ETF Acc,2,,,
+49,Leveraged & inverse,S&P 500 SHORT,LU0322251520,Xtrackers S&P 500 Inverse Daily Swap UCITS ETF 1C,-1,XSPD.L,LSE,USD
+50,Leveraged & inverse,EURO STOXX 2X,FR0010468983,Amundi EURO STOXX 50 Daily (2x) Leveraged UCITS ETF Acc,2,LVE.PA,Paris,EUR

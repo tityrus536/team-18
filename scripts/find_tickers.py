@@ -4,6 +4,7 @@ Run from the project root:
     python scripts/find_tickers.py --limit 3          # test on 3 ETFs first
     python scripts/find_tickers.py                    # all ETFs without a ticker
     python scripts/find_tickers.py --only NASDAQ GOLD # specific ETFs (even if filled)
+    python scripts/find_tickers.py --no-llm           # without Gemini: fixed rules choose
 
 Then open outputs/ticker_proposals.csv, check each proposal, write "yes" in the
 "approved" column for the ones you accept, and run scripts/apply_tickers.py.
@@ -24,6 +25,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--only", nargs="*", help="deck tickers to search, e.g. NASDAQ GOLD")
     parser.add_argument("--limit", type=int, help="stop after this many ETFs (for testing)")
+    parser.add_argument("--no-llm", action="store_true",
+                        help="choose with fixed rules instead of Gemini (no quota used, less careful on share class)")
     args = parser.parse_args()
 
     u = load_universe()
@@ -33,10 +36,10 @@ if __name__ == "__main__":
         etfs = u[u["yahoo_ticker"].isna()]
     if args.limit:
         etfs = etfs.head(args.limit)
-    print(f"Searching tickers for {len(etfs)} ETFs: Yahoo first (no quota used), then about "
-          f"{-(-len(etfs) // 10)} Gemini requests.\n")
+    then = "rules, no Gemini" if args.no_llm else f"about {-(-len(etfs) // 10)} Gemini requests"
+    print(f"Searching tickers for {len(etfs)} ETFs: Yahoo first (no quota used), then {then}.\n")
 
-    proposals = run_ticker_finder(etfs)
+    proposals = run_ticker_finder(etfs, use_llm=not args.no_llm)
     out = ROOT / "outputs" / "ticker_proposals.csv"
     if out.exists():  # keep earlier proposals, replace the ones searched again
         old = pd.read_csv(out)
