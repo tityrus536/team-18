@@ -31,7 +31,7 @@ Data -> Technical + Macro (in parallel) -> Portfolio Options -> Risk -> Challeng
 | Macro/News | placeholder | To build | |
 | Portfolio Options | `qdc/agents/options.py` | **Working**: Python builds 3 options + orders, LLM explains (1 request) | |
 | Risk | `qdc/agents/risk.py` | **Working**: plain Python, checks options against `config/rules.yaml` | |
-| Challenger | placeholder | To build | |
+| Challenger | `qdc/agents/challenger.py` | **Working**: Python gathers evidence (correlation, stress tests), LLM writes objections (1 request) | |
 
 ## Setup (once, about 15 minutes)
 
@@ -63,7 +63,8 @@ python scripts/run_technical_agent.py                 # Technical agent on the l
 python scripts/run_technical_agent.py --as-of 2026-10-30   # as if it were that date
 python scripts/run_pipeline.py                        # whole workflow, placeholders only
 python scripts/run_pipeline.py --real data technical  # whole workflow, real Data and Technical agents
-python scripts/run_pipeline.py --real data options risk --no-llm   # real Data, Options, Risk, no Gemini needed
+python scripts/run_pipeline.py --real data options risk challenger --no-llm   # all real agents that need no Gemini
+python scripts/run_pipeline.py --real data technical options risk challenger  # everything but Macro (~4 Gemini requests)
 ```
 
 Reports are saved in `outputs/` (each pipeline run in `outputs/run_<date>.json`). Copy the ones you use to the Drive.
@@ -116,6 +117,7 @@ qdc/agents/data_agent.py  the Data agent
 qdc/agents/technical.py   the Technical agent
 qdc/agents/options.py     the Portfolio Options agent
 qdc/agents/risk.py        the Risk agent
+qdc/agents/challenger.py  the Challenger agent
 qdc/agents/placeholders.py fake agents until the real ones exist
 qdc/agents/graph.py       all agents connected with LangGraph
 scripts/                  commands to run
