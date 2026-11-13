@@ -21,6 +21,7 @@ limits:
   max_cash: 0.50                     # CASH weight (uninvested money)
   max_volatility: 0.25               # annualised portfolio volatility, last 12 months
   weight_tolerance: 0.01             # weights must add up to 1 within this
+  max_orders_per_day: 5              # buy + sell orders in one day (team decision, 13 Nov 2026)
 
 # Soft limits: breaking one gives a "warning" (shown to the humans, not sent back).
 warnings:

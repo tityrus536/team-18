@@ -113,3 +113,32 @@ def test_llm_used_once_and_failure_falls_back_to_rule_text():
 
     opts = options.run_options_agent(STATE, llm=Broken(), prices=PRICES, universe=UNIVERSE, rules=RULES)
     assert all("no LLM" in o["rationale"] for o in opts)
+
+
+def test_never_more_orders_than_the_daily_limit_from_cash():
+    limit = RULES["limits"]["max_orders_per_day"]
+    for o in run():
+        assert len(o["orders"]) <= limit and o["deferred_orders"] == []
+        assert len([t for t in o["weights"] if t != "CASH"]) <= limit
+        assert risk.check_option(o, RULES, PRICES, UNIVERSE)["breaches"] == []
+
+
+def test_rebalancing_keeps_largest_orders_and_defers_the_rest():
+    holdings = {"URANIUM": 5, "EUROPE 600": 5, "QUANTUM": 5, "NASDAQ 3X": 5, "INDIA": 5, "GOLD": 5}
+    state = {**STATE, "portfolio": {"cash_eur": 3_000, "holdings": holdings}}
+    limit = RULES["limits"]["max_orders_per_day"]
+    for o in run(state):
+        assert len(o["orders"]) <= limit
+        if o["deferred_orders"]:
+            kept = min(x["amount_eur"] for x in o["orders"])
+            assert all(d["amount_eur"] <= kept or d["action"] == "buy" for d in o["deferred_orders"])
+            assert o["weights"] != o["target_weights"]          # weights = after today's orders
+            assert abs(sum(o["weights"].values()) - 1) < 1e-3
+            assert o["weights"]["CASH"] >= -1e-3                 # never spends cash it doesn't have
+
+
+def test_risk_fails_an_option_with_too_many_orders():
+    o = run()[0]
+    too_many = {**o, "orders": [{"deck_ticker": "WORLD", "action": "buy", "units": 1, "amount_eur": 100}] * 6}
+    out = risk.check_option(too_many, RULES, PRICES, UNIVERSE)
+    assert any("6 orders, above the limit of 5 per day" in b for b in out["breaches"])
