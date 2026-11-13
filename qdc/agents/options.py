@@ -83,7 +83,8 @@ def score_etfs(prices: pd.DataFrame, universe: pd.DataFrame, rules: dict,
 
 
 def build_weights(budgets: dict[str, float], table: pd.DataFrame, rules: dict,
-                  exclude: set[str] = frozenset(), risk_scale: float = 1.0) -> tuple[dict[str, float], dict]:
+                  exclude: set[str] = frozenset(), risk_scale: float = 1.0,
+                  max_positions: int | None = None) -> tuple[dict[str, float], dict]:
     """Target weights for one profile, within the limits of rules.yaml by construction.
 
     Returns (weights, budget each tier could not use). Within a tier, ETFs are filled to
@@ -114,10 +115,13 @@ def build_weights(budgets: dict[str, float], table: pd.DataFrame, rules: dict,
         candidates = table[(table["tier"] == tier) & (table["score"] >= min_score)]
         if tier == "Core" and BENCHMARK in candidates.index:
             candidates = pd.concat([candidates.loc[[BENCHMARK]], candidates.drop(BENCHMARK)])
-        for step_cap in (cap / 2, cap):  # spread first, then top up
+        # spread first, then top up; with few positions allowed, go straight to the full cap
+        for step_cap in ((cap,) if max_positions else (cap / 2, cap)):
             for t, row in candidates.iterrows():
                 if amount_left < min_w:
                     break
+                if max_positions and t not in weights and len(weights) >= max_positions:
+                    continue  # no room for another ETF (order limit)
                 w = min(step_cap - weights.get(t, 0), amount_left, lim["max_theme"] - theme_used[row["theme"]])
                 if w < min_w and not (t in weights and w > 1e-9):  # no tiny new position
                     continue
@@ -169,6 +173,36 @@ def make_orders(weights: dict[str, float], portfolio: dict, last_prices: pd.Seri
                            "amount_eur": round(abs(diff) * price, 2)})
     orders.sort(key=lambda o: o["action"] != "sell")
     return orders, round(total, 2)
+
+
+def limit_orders(orders: list[dict], max_orders: int, cash_eur: float) -> tuple[list[dict], list[dict]]:
+    """Keep the max_orders largest orders for today; the rest wait for the next days.
+
+    If the kept buys need more cash than the kept sells free up, the smallest buys wait too.
+    Returns (today's orders, deferred orders).
+    """
+    by_size = sorted(orders, key=lambda o: -o["amount_eur"])
+    today, later = by_size[:max_orders], by_size[max_orders:]
+
+    def cash_after(kept):
+        return cash_eur + sum(o["amount_eur"] if o["action"] == "sell" else -o["amount_eur"] for o in kept)
+
+    while cash_after(today) < 0:
+        smallest_buy = min((o for o in today if o["action"] == "buy"), key=lambda o: o["amount_eur"])
+        today.remove(smallest_buy)
+        later.append(smallest_buy)
+    today.sort(key=lambda o: o["action"] != "sell")
+    return today, later
+
+
+def weights_after(orders: list[dict], portfolio: dict, last_prices: pd.Series, total: float) -> dict[str, float]:
+    """The portfolio's weights once today's orders are filled (at the last prices)."""
+    units = dict((portfolio or {}).get("holdings", {}) or {})
+    for o in orders:
+        units[o["deck_ticker"]] = units.get(o["deck_ticker"], 0) + (o["units"] if o["action"] == "buy" else -o["units"])
+    w = {t: round(u * float(last_prices[t]) / total, 4) for t, u in units.items() if u > 0}
+    w[CASH] = round(1 - sum(w.values()), 4)
+    return w
 
 
 def option_metrics(weights: dict[str, float], prices: pd.DataFrame) -> dict:
@@ -282,11 +316,21 @@ def run_options_agent(state: dict, use_llm: bool = True, llm=None, prices: pd.Da
     options = []
     for name, budgets in rules["profiles"].items():
         adj = adjust.get(name, {"exclude": [], "risk_scale": 1.0})
-        weights, unused = build_weights(budgets, table, rules, set(adj["exclude"]), adj["risk_scale"])
-        orders, total = make_orders(weights, state.get("portfolio") or {}, last, universe,
-                                    rules["trading"]["min_order_eur"])
+        portfolio = state.get("portfolio") or {}
+        max_orders = rules["limits"].get("max_orders_per_day")
+        # from cash, every position is one buy order: build no more positions than allowed orders
+        max_positions = max_orders if max_orders and not portfolio.get("holdings") else None
+        weights, unused = build_weights(budgets, table, rules, set(adj["exclude"]), adj["risk_scale"],
+                                        max_positions)
+        orders, total = make_orders(weights, portfolio, last, universe, rules["trading"]["min_order_eur"])
+        target, deferred = weights, []
+        if max_orders and len(orders) > max_orders:  # rebalancing needs more orders: do the largest today
+            orders, deferred = limit_orders(orders, max_orders, float(portfolio.get("cash_eur", 0) or 0))
+            weights = weights_after(orders, portfolio, last, total)
         options.append({
             "name": name, "weights": weights, "orders": orders, "portfolio_value_eur": total,
+            "target_weights": target,     # where the option wants to go
+            "deferred_orders": deferred,  # orders left for the next days (daily order limit)
             "unused_budget": unused,  # per tier, budget moved to safer tiers: no ETF with a good enough signal
             "metrics": option_metrics(weights, prices),
             "signals_used": {t: f"{table.loc[t, 'signal']} ({table.loc[t, 'confidence']}, {table.loc[t, 'source']})"

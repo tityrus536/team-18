@@ -91,6 +91,9 @@ def check_option(option: dict, rules: dict, prices: pd.DataFrame, universe: pd.D
             breaches.append(f"theme {theme}: {tw:.1%}, above the {lim['max_theme']:.0%} limit")
     if weights.get(CASH, 0) > lim["max_cash"] + 1e-9:
         breaches.append(f"cash {weights[CASH]:.1%} is above the {lim['max_cash']:.0%} limit")
+    max_orders = lim.get("max_orders_per_day")
+    if max_orders and len(option.get("orders") or []) > max_orders:
+        breaches.append(f"{len(option['orders'])} orders, above the limit of {max_orders} per day")
 
     # 4. risk metrics on the last 12 months (only ETFs with prices)
     priced = {t: w for t, w in etfs.items() if t in prices and not prices[t].dropna().empty}
